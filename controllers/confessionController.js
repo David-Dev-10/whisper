@@ -6,7 +6,7 @@ export const createConfession = async (req, res) => {
   try {
     const {
       text,
-      category,
+      categoryId,
       location,
       address,
       authorId
@@ -18,7 +18,7 @@ export const createConfession = async (req, res) => {
 
     const confession = new Confession({
       text,
-      category,
+      categoryId,
       location,
       address,
       authorId
@@ -39,21 +39,43 @@ export const createConfession = async (req, res) => {
 // 🔹 Get All Confessions
 export const getAllConfessions = async (req, res) => {
   try {
-    const { category, page = 1, size = 10 } = req.query;
+    const { categoryId, page = 1, size = 10, userId } = req.query;
 
     const pageNum = parseInt(page);
     const pageSize = parseInt(size);
     const skip = (pageNum - 1) * pageSize;
 
     const filter = {};
-    if (category) filter.category = category;
+    if (categoryId) filter.categoryId = categoryId;
 
-    const confessions = await Confession.find(filter).populate({
-      path: "authorId",
-      select: "randomUsername",
-    }).sort({ timestamp: -1 }).skip(skip)
-      .limit(pageSize);
+    const confessions = await Confession.find(filter)
+      .populate({ path: 'authorId', select: 'randomUsername' })
+      .populate({ path: 'categoryId', select: 'name' })
+      .sort({ timestamp: -1 })
+      .skip(skip)
+      .limit(pageSize)
+      .lean();
+
     const total = await Confession.countDocuments(filter);
+
+    if (userId) {
+      const confessionIds = confessions.map(c => c._id);
+
+      const userReactions = await ConfessionReaction.find({
+        confessionId: { $in: confessionIds },
+        userId: userId
+      }).select('confessionId');
+
+      const reactedIds = new Set(userReactions.map(r => r.confessionId.toString()));
+
+      confessions.forEach(c => {
+        c.isReact = reactedIds.has(c._id.toString());
+      });
+    } else {
+      confessions.forEach(c => {
+        c.isReact = false;
+      });
+    }
 
     res.status(200).json({
       total,
@@ -70,14 +92,35 @@ export const getAllConfessions = async (req, res) => {
 export const getConfessionById = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ message: 'Invalid ID' });
+    const { userId } = req.query;
 
-    const confession = await Confession.findById(id);
-    if (!confession) return res.status(404).json({ message: 'Confession not found' });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid confession ID' });
+    }
+
+    const confession = await Confession.findById(id)
+      .populate({ path: "authorId", select: "randomUsername" })
+      .populate({ path: "categoryId", select: "name" })
+      .lean();
+
+    if (!confession) {
+      return res.status(404).json({ message: 'Confession not found' });
+    }
+
+    if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+      const reaction = await ConfessionReaction.findOne({
+        confessionId: id,
+        userId
+      }).select('_id');
+
+      confession.isReact = !!reaction;
+    } else {
+      confession.isReact = false;
+    }
 
     res.status(200).json(confession);
   } catch (error) {
-    console.error("ERROR", error.message)
+    console.error("ERROR", error.message);
     res.status(500).json({ message: 'Error retrieving confession.' });
   }
 };
@@ -86,7 +129,7 @@ export const getConfessionById = async (req, res) => {
 export const updateConfession = async (req, res) => {
   try {
     const { id } = req.params;
-    const { text, category, authorId } = req.body;
+    const { text, categoryId, authorId } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ message: 'Invalid ID' });
 
@@ -98,7 +141,7 @@ export const updateConfession = async (req, res) => {
     }
 
     if (text) confession.text = text;
-    if (category) confession.category = category;
+    if (categoryId) confession.categoryId = categoryId;
 
     await confession.save();
     res.status(200).json({ message: 'Confession updated', confession });
@@ -115,10 +158,7 @@ export const deleteConfession = async (req, res) => {
 
     if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ message: 'Invalid ID' });
 
-    const confession = await Confession.findById(id).populate({
-      path: "authorId",
-      select: "randomUsername",
-    });
+    const confession = await Confession.findById(id);
     if (!confession) return res.status(404).json({ message: 'Confession not found' });
 
     if (confession.authorId.toString() !== authorId) {
@@ -136,7 +176,7 @@ export const deleteConfession = async (req, res) => {
 export const getConfessionsByAuthor = async (req, res) => {
   try {
     const { authorId } = req.params;
-    const { category, size = 10, page = 1 } = req.query;
+    const { categoryId, size = 10, page = 1, userId } = req.query;
 
     const pageNum = parseInt(page);
     const pageSize = parseInt(size);
@@ -147,14 +187,35 @@ export const getConfessionsByAuthor = async (req, res) => {
     }
 
     const filter = { authorId };
-    if (category) filter.category = category;
+    if (categoryId) filter.categoryId = categoryId;
 
-    const confessions = await Confession.find({ authorId }).populate({
-      path: "authorId",
-      select: "randomUsername",
-    }).sort({ timestamp: -1 }).skip(skip).limit(pageSize);
+    const confessions = await Confession.find(filter)
+      .populate({ path: "authorId", select: "randomUsername" })
+      .populate({ path: "categoryId", select: "name" })
+      .sort({ timestamp: -1 })
+      .skip(skip)
+      .limit(pageSize)
+      .lean();
 
     const total = await Confession.countDocuments(filter);
+
+    if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+      const confessionIds = confessions.map(c => c._id);
+      const reactions = await ConfessionReaction.find({
+        confessionId: { $in: confessionIds },
+        userId
+      }).select('confessionId');
+
+      const reactedIds = new Set(reactions.map(r => r.confessionId.toString()));
+
+      confessions.forEach(c => {
+        c.isReact = reactedIds.has(c._id.toString());
+      });
+    } else {
+      confessions.forEach(c => {
+        c.isReact = false;
+      });
+    }
 
     res.status(200).json({
       total,
@@ -228,9 +289,15 @@ export const getNearbyConfessions = async (req, res) => {
             type: 'Point',
             coordinates: [parseFloat(longitude), parseFloat(latitude)]
           },
-          $maxDistance: parseInt(maxDistance)  // optional, in meters
+          $maxDistance: parseInt(maxDistance)
         }
       }
+    }).populate({
+      path: "authorId",
+      select: "randomUsername",
+    }).populate({
+      path: "categoryId",
+      select: "name",
     });
 
     res.status(200).json({ confessions });

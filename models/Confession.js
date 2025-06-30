@@ -18,9 +18,10 @@ const confessionSchema = new mongoose.Schema({
     }
   },
   address: String,
-  category: {
-    type: String,
-    enum: ['Funny', 'Sad', 'Love', 'Work', 'Other']
+  categoryId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "ConfessionCategory",
+    required: true
   },
   upvotes: {
     type: Number,
