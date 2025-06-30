@@ -48,7 +48,10 @@ export const getAllConfessions = async (req, res) => {
     const filter = {};
     if (category) filter.category = category;
 
-    const confessions = await Confession.find(filter).sort({ timestamp: -1 }).skip(skip)
+    const confessions = await Confession.find(filter).populate({
+      path: "authorId",
+      select: "randomUsername",
+    }).sort({ timestamp: -1 }).skip(skip)
       .limit(pageSize);
     const total = await Confession.countDocuments(filter);
 
@@ -112,7 +115,10 @@ export const deleteConfession = async (req, res) => {
 
     if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ message: 'Invalid ID' });
 
-    const confession = await Confession.findById(id);
+    const confession = await Confession.findById(id).populate({
+      path: "authorId",
+      select: "randomUsername",
+    });
     if (!confession) return res.status(404).json({ message: 'Confession not found' });
 
     if (confession.authorId.toString() !== authorId) {
@@ -143,7 +149,10 @@ export const getConfessionsByAuthor = async (req, res) => {
     const filter = { authorId };
     if (category) filter.category = category;
 
-    const confessions = await Confession.find({ authorId }).sort({ timestamp: -1 }).skip(skip).limit(pageSize);
+    const confessions = await Confession.find({ authorId }).populate({
+      path: "authorId",
+      select: "randomUsername",
+    }).sort({ timestamp: -1 }).skip(skip).limit(pageSize);
 
     const total = await Confession.countDocuments(filter);
 
