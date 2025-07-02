@@ -132,7 +132,7 @@ export const getCommentsByConfessionId = async (req, res) => {
 
     const comments = await Comment.find({ confessionId })
       .populate('quotedCommentId', 'text username') // populate quoted comment text + user
-      .sort({ timestamp: -1 })
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(pageSize);
 
