@@ -1,13 +1,15 @@
+import "dotenv/config";
 import express from "express";
-import dotenv from 'dotenv';
+import cors from "cors";
 import mongoose from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
 import confessionRoutes from './routes/confessionRoutes.js';
 import commentRoutes from "./routes/commentRoutes.js";
 import confessionCategoryRoutes from "./routes/confessionCategoryRoutes.js";
 
-dotenv.config();
-const app = express();
+import { app, server } from "./sockets/socket.js";
+
+app.use(cors());
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);
@@ -16,4 +18,4 @@ app.use("/api/comment", commentRoutes);
 app.use('/api/confession-categories', confessionCategoryRoutes);
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));

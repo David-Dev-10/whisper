@@ -51,7 +51,7 @@ export const getAllConfessions = async (req, res) => {
     const confessions = await Confession.find(filter)
       .populate({ path: 'authorId', select: 'randomUsername' })
       .populate({ path: 'categoryId', select: 'name' })
-      .sort({ timestamp: -1 })
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(pageSize)
       .lean();

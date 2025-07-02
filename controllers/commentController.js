@@ -1,7 +1,7 @@
 import Comment from '../models/Comment.js';
 import CommentReaction from '../models/CommentReaction.js';
 import Confession from '../models/Confession.js';
-import mongoose from 'mongoose';
+import { io } from "../sockets/socket.js";
 
 // Add a new comment (with optional quote)
 export const addComment = async (req, res) => {
@@ -21,6 +21,7 @@ export const addComment = async (req, res) => {
       $inc: { commentsCount: 1 }
     });
 
+    io.to(confessionId).emit("commentAdded", comment);
     res.status(201).json({ message: 'Comment added.', comment });
   } catch (error) {
     res.status(500).json({ message: 'Error adding comment.' });
