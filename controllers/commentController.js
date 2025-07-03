@@ -82,41 +82,64 @@ export const reactToComment = async (req, res) => {
 
     const existing = await CommentReaction.findOne({ commentId, userId });
 
-    if (existing) {
-      const oldEmoji = existing.emoji;
+    // 1. No previous reaction → Add default or selected emoji
+    if (!existing) {
+      const newEmoji = emoji || '👍'; // default fallback
+      const reaction = new CommentReaction({ commentId, userId, emoji: newEmoji });
+      await reaction.save();
 
-      if (oldEmoji === emoji) {
-        return res.status(200).json({ message: 'Reaction unchanged.', reaction: existing });
-      }
-
-      // Update reaction document
-      existing.emoji = emoji;
-      await existing.save();
-
-      // Update emoji counts on the comment
       await Comment.findByIdAndUpdate(commentId, {
-        $inc: {
-          [`reactions.${oldEmoji}`]: -1,
-          [`reactions.${emoji}`]: 1
-        }
+        $inc: { [`reactions.${newEmoji}`]: 1 }
       });
 
-      return res.status(200).json({ message: 'Reaction updated.', reaction: existing });
+      return res.status(201).json({ message: 'Reaction added.', reaction });
     }
 
-    // New reaction
-    const reaction = new CommentReaction({ commentId, userId, emoji });
-    await reaction.save();
+    // 2. User clicked like button again (no emoji selected) → remove
+    if (!emoji) {
+      const removedEmoji = existing.emoji;
+      await CommentReaction.deleteOne({ _id: existing._id });
 
-    // Increment the count for the new emoji
+      await Comment.findByIdAndUpdate(commentId, {
+        $inc: { [`reactions.${removedEmoji}`]: -1 }
+      });
+
+      // Cleanup if count drops to 0
+      await Comment.updateOne(
+        { _id: commentId, [`reactions.${removedEmoji}`]: { $lte: 0 } },
+        { $unset: { [`reactions.${removedEmoji}`]: "" } }
+      );
+
+      return res.status(200).json({ message: 'Reaction removed.' });
+    }
+
+    // 3. User selected a new emoji → update
+    const oldEmoji = existing.emoji;
+
+    if (oldEmoji === emoji) {
+      return res.status(200).json({ message: 'Reaction unchanged.', reaction: existing });
+    }
+
+    existing.emoji = emoji;
+    await existing.save();
+
     await Comment.findByIdAndUpdate(commentId, {
-      $inc: { [`reactions.${emoji}`]: 1 }
+      $inc: {
+        [`reactions.${oldEmoji}`]: -1,
+        [`reactions.${emoji}`]: 1
+      }
     });
 
-    res.status(201).json({ message: 'Reaction added.', reaction });
+    // Clean up if old emoji count drops to 0
+    await Comment.updateOne(
+      { _id: commentId, [`reactions.${oldEmoji}`]: { $lte: 0 } },
+      { $unset: { [`reactions.${oldEmoji}`]: "" } }
+    );
+
+    return res.status(200).json({ message: 'Reaction updated.', reaction: existing });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error reacting to comment.' });
+    console.error('React to comment error:', error);
+    res.status(500).json({ message: 'Failed to react to comment.' });
   }
 };
 
