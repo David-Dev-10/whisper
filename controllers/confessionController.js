@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Confession from "../models/Confession.js";
 import ConfessionReaction from '../models/ConfessionReaction.js';
+import { io } from "../sockets/socket.js";
 
 export const createConfession = async (req, res) => {
   try {
@@ -25,6 +26,9 @@ export const createConfession = async (req, res) => {
     });
 
     await confession.save();
+
+    io.to(categoryId).emit("confessionAdded", confession);
+    io.emit('newConfession', confession);
 
     res.status(201).json({
       message: 'Confession created successfully.',

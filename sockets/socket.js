@@ -16,10 +16,16 @@ const io = new Server(server, {
 io.on("connection", (socket) => {
   console.log("User connected: ", socket.id);
 
+  socket.on('joinConfessionCategory', (categoryId) => {
+    socket.join(categoryId);
+  });
+
   socket.on('joinConfession', (confessionId) => {
     socket.join(confessionId);
+  });
 
-    console.log(`User join confession ${confessionId}`);
+  socket.on("joinCommentThread", (commentId) => {
+    socket.join(`comment-${commentId}`);
   });
 
   socket.on("disconnect", () => {
