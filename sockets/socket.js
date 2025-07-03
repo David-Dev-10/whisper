@@ -24,8 +24,8 @@ io.on("connection", (socket) => {
     socket.join(confessionId);
   });
 
-  socket.on("joinCommentThread", (commentId) => {
-    socket.join(`comment-${commentId}`);
+  socket.on("joinReaction", (commentId) => {
+    socket.join(`reaction-${commentId}`);
   });
 
   socket.on("disconnect", () => {

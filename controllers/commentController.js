@@ -84,12 +84,19 @@ export const reactToComment = async (req, res) => {
 
     // 1. No previous reaction → Add default or selected emoji
     if (!existing) {
-      const newEmoji = emoji || '👍'; // default fallback
+      const newEmoji = emoji || '👍';
       const reaction = new CommentReaction({ commentId, userId, emoji: newEmoji });
       await reaction.save();
 
       await Comment.findByIdAndUpdate(commentId, {
         $inc: { [`reactions.${newEmoji}`]: 1 }
+      });
+
+      io.to(`reaction-${commentId}`).emit("commentReactionUpdated", {
+        commentId,
+        userId,
+        emoji: newEmoji,
+        action: "added"
       });
 
       return res.status(201).json({ message: 'Reaction added.', reaction });
@@ -109,6 +116,13 @@ export const reactToComment = async (req, res) => {
         { _id: commentId, [`reactions.${removedEmoji}`]: { $lte: 0 } },
         { $unset: { [`reactions.${removedEmoji}`]: "" } }
       );
+
+      io.to(`reaction-${commentId}`).emit("commentReactionUpdated", {
+        commentId,
+        userId,
+        emoji: removedEmoji,
+        action: "removed"
+      });
 
       return res.status(200).json({ message: 'Reaction removed.' });
     }
@@ -135,6 +149,14 @@ export const reactToComment = async (req, res) => {
       { _id: commentId, [`reactions.${oldEmoji}`]: { $lte: 0 } },
       { $unset: { [`reactions.${oldEmoji}`]: "" } }
     );
+
+    io.to(`reaction-${commentId}`).emit("commentReactionUpdated", {
+      commentId,
+      userId,
+      oldEmoji,
+      emoji,
+      action: "updated"
+    });
 
     return res.status(200).json({ message: 'Reaction updated.', reaction: existing });
   } catch (error) {
