@@ -27,6 +27,11 @@ export const createConfession = async (req, res) => {
 
     await confession.save();
 
+    await confession.populate({
+      path: "authorId",
+      select: "randomUsername"
+    })
+
     io.to(categoryId).emit("confessionAdded", confession);
     io.emit('newConfession', confession);
 
