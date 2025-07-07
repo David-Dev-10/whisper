@@ -18,12 +18,12 @@ io.on("connection", (socket) => {
 
   socket.on('joinConfessionCategory', ({ categoryId }) => {
     socket.join(categoryId);
-    console.log(`User ${socket.id} joined confession category`);
+    console.log(`User ${socket.id} joined confession category ${categoryId}`);
   });
 
   socket.on('joinConfession', ({ confessionId }) => {
     socket.join(confessionId);
-    console.log(`User ${socket.id} joined confession`);
+    console.log(`User ${socket.id} joined confession ${confessionId}`);
   });
 
   socket.on("joinReaction", ({ commentId }) => {

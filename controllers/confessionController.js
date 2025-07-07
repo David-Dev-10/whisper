@@ -262,6 +262,13 @@ export const reactToConfession = async (req, res) => {
         action: "ADDED"
       });
 
+      io.emit("broadcastConfessionReactionUpdated", {
+        confessionId,
+        userId,
+        emoji: newEmoji,
+        action: "ADDED"
+      })
+
       return res.status(201).json({ message: 'Reaction added.', reaction });
     }
 
@@ -286,6 +293,13 @@ export const reactToConfession = async (req, res) => {
         emoji: removedEmoji,
         action: "REMOVED"
       });
+
+      io.emit("broadcastConfessionReactionUpdated", {
+        confessionId,
+        userId,
+        emoji: removedEmoji,
+        action: "REMOVED"
+      })
 
       return res.status(200).json({ message: 'Reaction removed.' });
     }
@@ -320,6 +334,14 @@ export const reactToConfession = async (req, res) => {
       emoji,
       action: "UPDATED"
     });
+
+    io.emit("broadcastConfessionReactionUpdated", {
+      confessionId,
+      userId,
+      oldEmoji,
+      emoji,
+      action: "UPDATED"
+    })
 
     return res.status(200).json({ message: 'Reaction updated.', reaction: existing });
 
