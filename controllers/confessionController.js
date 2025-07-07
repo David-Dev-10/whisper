@@ -32,8 +32,8 @@ export const createConfession = async (req, res) => {
       select: "randomUsername"
     })
 
-    io.to(categoryId).emit("confessionAdded", confession);
-    io.emit('newConfession', confession);
+    io.to(categoryId).emit("confessionAdded", confession); // For particular category page
+    io.emit('newConfession', confession); // For all category page
 
     res.status(201).json({
       message: 'Confession created successfully.',
@@ -241,41 +241,88 @@ export const getConfessionsByAuthor = async (req, res) => {
 // 🔹 Add/Update Reaction to a confession
 export const reactToConfession = async (req, res) => {
   try {
-    const { confessionId, userId, emoji } = req.body;
+    const { categoryId, confessionId, userId, emoji } = req.body;
 
     const existing = await ConfessionReaction.findOne({ confessionId, userId });
 
-    if (existing) {
-      const oldEmoji = existing.emoji;
+    // 1. No previous reaction → Add default or selected emoji
+    if (!existing) {
+      const newEmoji = emoji || '👍';
+      const reaction = new ConfessionReaction({ confessionId, userId, emoji: newEmoji });
+      await reaction.save();
 
-      if (oldEmoji === emoji) {
-        return res.status(200).json({ message: 'Reaction unchanged.', reaction: existing });
-      }
-
-      // Update user's reaction
-      existing.emoji = emoji;
-      await existing.save();
-
-      // Update the aggregate emoji counts on Confession
       await Confession.findByIdAndUpdate(confessionId, {
-        $inc: {
-          [`reactions.${oldEmoji}`]: -1,
-          [`reactions.${emoji}`]: 1
-        }
+        $inc: { [`reactions.${newEmoji}`]: 1 }
       });
 
-      return res.status(200).json({ message: 'Reaction updated.', reaction: existing });
+      io.to(categoryId).emit("confessionReactionUpdated", {
+        confessionId,
+        userId,
+        emoji: newEmoji,
+        action: "ADDED"
+      });
+
+      return res.status(201).json({ message: 'Reaction added.', reaction });
     }
 
-    // New reaction
-    const reaction = new ConfessionReaction({ confessionId, userId, emoji });
-    await reaction.save();
+    // 2. User clicked like button again (no emoji selected) → remove
+    if (!emoji) {
+      const removedEmoji = existing.emoji;
+      await ConfessionReaction.deleteOne({ _id: existing._id });
+
+      await Confession.findByIdAndUpdate(confessionId, {
+        $inc: { [`reactions.${removedEmoji}`]: -1 }
+      });
+
+      // Cleanup if count drops to 0
+      await Confession.updateOne(
+        { _id: confessionId, [`reactions.${removedEmoji}`]: { $lte: 0 } },
+        { $unset: { [`reactions.${removedEmoji}`]: "" } }
+      );
+
+      io.to(categoryId).emit("confessionReactionUpdated", {
+        confessionId,
+        userId,
+        emoji: removedEmoji,
+        action: "REMOVED"
+      });
+
+      return res.status(200).json({ message: 'Reaction removed.' });
+    }
+
+    // 3. User selected a new emoji → update
+    const oldEmoji = existing.emoji;
+
+    if (oldEmoji === emoji) {
+      return res.status(200).json({ message: 'Reaction unchanged.', reaction: existing });
+    }
+
+    existing.emoji = emoji;
+    await existing.save();
 
     await Confession.findByIdAndUpdate(confessionId, {
-      $inc: { [`reactions.${emoji}`]: 1 }
+      $inc: {
+        [`reactions.${oldEmoji}`]: -1,
+        [`reactions.${emoji}`]: 1
+      }
     });
 
-    res.status(201).json({ message: 'Reaction added.', reaction });
+    // Clean up if old emoji count drops to 0
+    await Confession.updateOne(
+      { _id: confessionId, [`reactions.${oldEmoji}`]: { $lte: 0 } },
+      { $unset: { [`reactions.${oldEmoji}`]: "" } }
+    );
+
+    io.to(categoryId).emit("confessionReactionUpdated", {
+      confessionId,
+      userId,
+      oldEmoji,
+      emoji,
+      action: "UPDATED"
+    });
+
+    return res.status(200).json({ message: 'Reaction updated.', reaction: existing });
+
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Error reacting to confession.' });

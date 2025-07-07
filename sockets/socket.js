@@ -16,15 +16,15 @@ const io = new Server(server, {
 io.on("connection", (socket) => {
   console.log("User connected: ", socket.id);
 
-  socket.on('joinConfessionCategory', (categoryId) => {
+  socket.on('joinConfessionCategory', ({ categoryId }) => {
     socket.join(categoryId);
   });
 
-  socket.on('joinConfession', (confessionId) => {
+  socket.on('joinConfession', ({ confessionId }) => {
     socket.join(confessionId);
   });
 
-  socket.on("joinReaction", (commentId) => {
+  socket.on("joinReaction", ({ commentId }) => {
     socket.join(`reaction-${commentId}`);
   });
 

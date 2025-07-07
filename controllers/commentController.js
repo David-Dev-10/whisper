@@ -6,7 +6,7 @@ import { io } from "../sockets/socket.js";
 // Add a new comment (with optional quote)
 export const addComment = async (req, res) => {
   try {
-    const { confessionId, text, username, authorId, quotedCommentId } = req.body;
+    const { cateogryId, confessionId, text, username, authorId, quotedCommentId } = req.body;
 
     const comment = new Comment({
       confessionId,
@@ -22,6 +22,7 @@ export const addComment = async (req, res) => {
     });
 
     io.to(confessionId).emit("commentAdded", comment);
+    io.to(cateogryId).emit("confessionCommentAdded", { confessionId, action: "ADDED" })
     res.status(201).json({ message: 'Comment added.', comment });
   } catch (error) {
     res.status(500).json({ message: 'Error adding comment.' });
