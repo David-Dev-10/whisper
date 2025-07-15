@@ -22,7 +22,7 @@ export const addComment = async (req, res) => {
     });
 
     io.to(confessionId).emit("commentAdded", comment);
-    io.to(categoryId).emit("confessionCommentAdded", { confessionId, action: "ADDED" })
+    io.to(categoryId).emit("confessionCommentAdded", { confessionId, comment, action: "ADDED" });
     res.status(201).json({ message: 'Comment added.', comment });
   } catch (error) {
     res.status(500).json({ message: 'Error adding comment.' });
