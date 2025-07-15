@@ -21,8 +21,13 @@ export const addComment = async (req, res) => {
       $inc: { commentsCount: 1 }
     });
 
+    await comment.populate({
+      path: "quotedCommentId",
+      select: "text username"
+    })
+
     io.to(confessionId).emit("commentAdded", comment);
-    io.to(categoryId).emit("confessionCommentAdded", { confessionId, comment, action: "ADDED" });
+    io.to(categoryId).emit("confessionCommentAdded", { confessionId, action: "ADDED" });
     res.status(201).json({ message: 'Comment added.', comment });
   } catch (error) {
     res.status(500).json({ message: 'Error adding comment.' });
