@@ -6,7 +6,7 @@ import { io } from "../sockets/socket.js";
 // Add a new comment (with optional quote)
 export const addComment = async (req, res) => {
   try {
-    const { cateogryId, confessionId, text, username, authorId, quotedCommentId } = req.body;
+    const { categoryId, confessionId, text, username, authorId, quotedCommentId } = req.body;
 
     const comment = new Comment({
       confessionId,
@@ -22,7 +22,7 @@ export const addComment = async (req, res) => {
     });
 
     io.to(confessionId).emit("commentAdded", comment);
-    io.to(cateogryId).emit("confessionCommentAdded", { confessionId, action: "ADDED" })
+    io.to(categoryId).emit("confessionCommentAdded", { confessionId, action: "ADDED" })
     res.status(201).json({ message: 'Comment added.', comment });
   } catch (error) {
     res.status(500).json({ message: 'Error adding comment.' });
@@ -79,7 +79,7 @@ export const deleteComment = async (req, res) => {
 // React or update reaction to a comment
 export const reactToComment = async (req, res) => {
   try {
-    const { commentId, userId, emoji } = req.body;
+    const { confessionId, commentId, userId, emoji } = req.body;
 
     const existing = await CommentReaction.findOne({ commentId, userId });
 
@@ -93,11 +93,11 @@ export const reactToComment = async (req, res) => {
         $inc: { [`reactions.${newEmoji}`]: 1 }
       });
 
-      io.to(`reaction-${commentId}`).emit("commentReactionUpdated", {
+      io.to(confessionId).emit("commentReactionUpdated", {
         commentId,
         userId,
         emoji: newEmoji,
-        action: "added"
+        action: "ADDED"
       });
 
       return res.status(201).json({ message: 'Reaction added.', reaction });
@@ -118,11 +118,11 @@ export const reactToComment = async (req, res) => {
         { $unset: { [`reactions.${removedEmoji}`]: "" } }
       );
 
-      io.to(`reaction-${commentId}`).emit("commentReactionUpdated", {
+      io.to(confessionId).emit("commentReactionUpdated", {
         commentId,
         userId,
         emoji: removedEmoji,
-        action: "removed"
+        action: "REMOVED"
       });
 
       return res.status(200).json({ message: 'Reaction removed.' });
@@ -151,12 +151,12 @@ export const reactToComment = async (req, res) => {
       { $unset: { [`reactions.${oldEmoji}`]: "" } }
     );
 
-    io.to(`reaction-${commentId}`).emit("commentReactionUpdated", {
+    io.to(confessionId).emit("commentReactionUpdated", {
       commentId,
       userId,
       oldEmoji,
       emoji,
-      action: "updated"
+      action: "UPDATED"
     });
 
     return res.status(200).json({ message: 'Reaction updated.', reaction: existing });
